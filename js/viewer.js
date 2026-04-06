@@ -5,6 +5,32 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 
+// Load terrain options from terrains.txt
+async function loadTerrainOptions() {
+    try {
+        const response = await fetch('terrains.txt');
+        const text = await response.text();
+        const terrains = text.trim().split('\n').filter(line => line.trim());
+        
+        const terrainSelect = document.getElementById('terrain-select');
+        terrainSelect.innerHTML = '';
+        
+        terrains.forEach(terrain => {
+            const option = document.createElement('option');
+            option.value = terrain.trim();
+            option.textContent = terrain.trim().replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            terrainSelect.appendChild(option);
+        });
+        
+        // Set default to first terrain
+        if (terrains.length > 0) {
+            terrainSelect.value = terrains[0].trim();
+        }
+    } catch (error) {
+        console.error('Failed to load terrains.txt:', error);
+    }
+}
+
 // Global variables
 let scene, camera, renderer, controls;
 let helicopterModel = null;
@@ -13,22 +39,20 @@ let tailRotor = null;
 let mainRotorSpeed = 0.5;
 let tailRotorSpeed = 0.5;
 let clock = new THREE.Clock();
-
-// Part selection variables
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
 let selectedPart = null;
 let hoveredPart = null;
 let originalMaterials = new Map();
-let highlightMaterial = new THREE.MeshBasicMaterial({ 
-    color: 0x00ff00, 
-    transparent: true, 
+let highlightMaterial = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    transparent: true,
     opacity: 0.3,
     side: THREE.DoubleSide
 });
-let hoverMaterial = new THREE.MeshBasicMaterial({ 
-    color: 0xffff00, 
-    transparent: true, 
+let hoverMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffff00,
+    transparent: true,
     opacity: 0.2,
     side: THREE.DoubleSide
 });
@@ -45,11 +69,43 @@ const tailRotorPatterns = [
 ];
 
 // Initialize the scene
+function createProceduralSky() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    // Draw gradient sky (blue at top, lighter at horizon)
+    const gradient = ctx.createLinearGradient(0, 0, 0, 1024);
+    gradient.addColorStop(0, '#1e90ff');      // Deep blue at top
+    gradient.addColorStop(0.3, '#4da6ff');    // Medium blue
+    gradient.addColorStop(0.7, '#87ceeb');    // Sky blue
+    gradient.addColorStop(1, '#e0f6ff');      // Very light at horizon
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    // Add some cloud effect with soft circles
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    for (let i = 0; i < 20; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 500; // Only in upper part
+        const radius = Math.random() * 100 + 50;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    const skyTexture = new THREE.CanvasTexture(canvas);
+    skyTexture.mapping = THREE.EquirectangularReflectionMapping;
+    return skyTexture;
+}
+
 function init() {
     // Create scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
     scene.fog = new THREE.Fog(0x1a1a2e, 50, 200);
+    scene.background = createProceduralSky();
 
     // Create camera
     camera = new THREE.PerspectiveCamera(
@@ -87,13 +143,14 @@ function init() {
     setupLighting();
 
     // Create ground
-    createGround();
+    createGround('rocky_terrain');
 
     // Load the FBX model
     loadModel();
 
     // Setup UI controls
     setupControls();
+    loadTerrainOptions();
 
     // Setup part selection interaction
     setupPartSelection();
@@ -141,24 +198,102 @@ function setupLighting() {
     scene.add(hemiLight);
 }
 
-// Create ground plane
-function createGround() {
-    const groundGeometry = new THREE.PlaneGeometry(200, 200);
+// Create ground plane with textures
+
+function createGround(ground_name) {
+    // ── Lighting ────────────────────────────────────────────────────────────
+    const sunLight = new THREE.DirectionalLight(0xfff4e0, 3.0); // warm sun color
+    sunLight.position.set(10, 40, 10);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width  = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far  = 500;
+    sunLight.shadow.camera.left   = -100;
+    sunLight.shadow.camera.right  =  100;
+    sunLight.shadow.camera.top    =  100;
+    sunLight.shadow.camera.bottom = -100;
+    scene.add(sunLight);
+
+    const ambientLight = new THREE.AmbientLight(0xFFFFFF, 1.0); // soft sky blue fill
+    scene.add(ambientLight);
+
+    const hemiLight = new THREE.HemisphereLight(0xfff4c0, 0x8B7355, 1.1); // sky / ground bounce
+    scene.add(hemiLight);
+
+    // ── Textures ─────────────────────────────────────────────────────────────
+    const textureLoader = new THREE.TextureLoader();
+
+    // Handle folder and texture name mapping
+    let folderName, texturePrefix;
+    if (ground_name === 'aerial_rocks') {
+        folderName = 'aerial_rocks_01_4k';
+        texturePrefix = 'aerial_rocks_01';
+    } else {
+        folderName = ground_name + '_4k';
+        texturePrefix = ground_name;
+    }
+
+    const diffTexture = textureLoader.load(folderName + '.blend/textures/' + texturePrefix + '_diff_4k.jpg');
+    diffTexture.wrapS = THREE.RepeatWrapping;
+    diffTexture.wrapT = THREE.RepeatWrapping;
+    diffTexture.repeat.set(20, 20);
+    diffTexture.colorSpace = THREE.SRGBColorSpace; // ← fix: correct color space
+
+
+    const normalTexture = textureLoader.load(folderName + '.blend/textures/' + texturePrefix + '_nor_gl_4k.exr');
+    normalTexture.wrapS = THREE.RepeatWrapping;
+    normalTexture.wrapT = THREE.RepeatWrapping;
+    normalTexture.repeat.set(20, 20);
+    normalTexture.flipY = false; // ← fix: Blender-exported normals don't need flipping
+
+    // ── Ground Mesh ───────────────────────────────────────────────────────────
+    const groundGeometry = new THREE.PlaneGeometry(200, 200, 128, 128);
     const groundMaterial = new THREE.MeshStandardMaterial({
-        color: 0x3d5c3d,
-        roughness: 0.9,
-        metalness: 0.1
+        map:         diffTexture,
+        normalMap:   normalTexture,
+        normalScale: new THREE.Vector2(1, 1),
+        roughness:   0.6,
+        metalness:   0.0
+        // ← no 'color' override — let the texture speak for itself
     });
+
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Grid helper
-    const gridHelper = new THREE.GridHelper(200, 50, 0x555555, 0x333333);
-    gridHelper.position.y = -1.99;
+    // ── Grid Helper ────────────────────────────────────────────────────────────
+    const gridHelper = new THREE.GridHelper(200, 50, 0xA09070, 0x807050);
+    gridHelper.position.y = -2.99;
     scene.add(gridHelper);
+}
+
+// Switch terrain texture
+function switchTerrain(terrainName) {
+    // Find and remove existing ground plane
+    const groundToRemove = scene.children.find(child =>
+        child.type === 'Mesh' && child.geometry && child.geometry.type === 'PlaneGeometry'
+    );
+    if (groundToRemove) {
+        scene.remove(groundToRemove);
+    }
+
+    // Find and remove existing grid helper
+    const gridToRemove = scene.children.find(child => child.type === 'GridHelper');
+    if (gridToRemove) {
+        scene.remove(gridToRemove);
+    }
+
+    // Remove all lights (we'll add new ones)
+    const lightsToRemove = scene.children.filter(child =>
+        child.type === 'DirectionalLight' || child.type === 'AmbientLight' || child.type === 'HemisphereLight'
+    );
+    lightsToRemove.forEach(light => scene.remove(light));
+
+    // Create new ground with selected texture
+    createGround(terrainName);
 }
 
 // Load FBX model
@@ -166,8 +301,9 @@ function loadModel() {
     const loader = new FBXLoader();
     
     loader.load(
-        'model.fbx',
+        'apacheFbx.fbx',
         function(object) {
+            console.log('FBX model loaded successfully:', object);
             helicopterModel = object;
             
             // Enable shadows for all meshes
@@ -208,21 +344,22 @@ function loadModel() {
             detectRotors(object);
 
             // Hide loading screen
-            document.getElementById('loading').style.display = 'none';
+            const loadingElement = document.getElementById('loading');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
 
             console.log('Model loaded successfully!');
             console.log('Model hierarchy:');
             logModelHierarchy(object);
+
+            console.log('Helicopter model added to scene');
         },
         function(progress) {
-            const percent = (progress.loaded / progress.total * 100).toFixed(0);
-            console.log('Loading: ' + percent + '%');
+            console.log('FBX loading progress:', (progress.loaded / progress.total * 100) + '%');
         },
         function(error) {
-            console.error('Error loading model:', error);
-            document.getElementById('loading').innerHTML = 
-                '<p style="color: #ff6b6b;">Error loading model!</p>' +
-                '<p style="font-size: 0.9rem; margin-top: 10px;">Make sure model.fbx is in the same folder as index.html</p>';
+            console.error('Error loading FBX model:', error);
         }
     );
 }
@@ -347,6 +484,12 @@ function setupControls() {
     autoRotateCheckbox.addEventListener('change', function() {
         controls.autoRotate = this.checked;
     });
+
+    // Terrain texture selector
+    const terrainSelect = document.getElementById('terrain-select');
+    terrainSelect.addEventListener('change', function() {
+        switchTerrain(this.value);
+    });
 }
 
 // Handle window resize
@@ -359,12 +502,15 @@ function onWindowResize() {
 // Setup part selection interaction
 function setupPartSelection() {
     const container = document.getElementById('canvas-container');
+    const canvas = renderer.domElement;
+    
+    console.log('Setting up part selection on canvas:', canvas);
     
     // Mouse move for hover effect
-    container.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mousemove', onMouseMove);
     
     // Click for selection
-    container.addEventListener('click', onMouseClick);
+    canvas.addEventListener('click', onMouseClick);
     
     // Create part info panel
     createPartInfoPanel();
@@ -458,15 +604,22 @@ function createPartInfoPanel() {
 
 // Mouse move handler for hover effect
 function onMouseMove(event) {
-    if (!helicopterModel) return;
+    if (!helicopterModel) {
+        console.log('No helicopter model loaded yet');
+        return;
+    }
     
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     
+    console.log('Mouse coords:', mouse.x, mouse.y, 'Event:', event.clientX, event.clientY);
+    
     raycaster.setFromCamera(mouse, camera);
     
     const intersects = raycaster.intersectObject(helicopterModel, true);
+    
+    console.log('Mouse move - intersects found:', intersects.length);
     
     // Remove existing hover info
     const existingHover = document.querySelector('.hover-info');
@@ -474,6 +627,8 @@ function onMouseMove(event) {
     
     if (intersects.length > 0) {
         const intersectedObject = getSelectableParent(intersects[0].object);
+        
+        console.log('Intersected object:', intersects[0].object.name, 'Selectable parent:', intersectedObject ? intersectedObject.name : 'none');
         
         if (intersectedObject && intersectedObject !== selectedPart) {
             // Remove previous hover highlight
@@ -491,7 +646,7 @@ function onMouseMove(event) {
             // Show hover tooltip
             const hoverInfo = document.createElement('div');
             hoverInfo.className = 'hover-info';
-            hoverInfo.textContent = hoveredPart.name || 'Unnamed Part';
+            hoverInfo.textContent = hoveredPart.name || `Part (${hoveredPart.type})`;
             hoverInfo.style.left = event.clientX + 15 + 'px';
             hoverInfo.style.top = event.clientY + 15 + 'px';
             document.body.appendChild(hoverInfo);
@@ -531,22 +686,33 @@ function onMouseClick(event) {
 
 // Get the selectable parent of an object
 function getSelectableParent(object) {
+    console.log('Getting selectable parent for:', object.name, 'type:', object.type);
     let current = object;
     
     while (current) {
+        console.log('Checking object:', current.name, 'type:', current.type);
         // Skip the root model and scene
         if (current === helicopterModel || current === scene) {
+            console.log('Reached root, returning null');
             return null;
         }
         
-        // Return if it's a mesh or group with a name
-        if ((current.isMesh || current.isGroup) && current.name && current.name !== '') {
+        // Return if it's a mesh (even without a name)
+        if (current.isMesh) {
+            console.log('Found selectable mesh:', current.name || 'unnamed');
+            return current;
+        }
+        
+        // Also return groups with names
+        if (current.isGroup && current.name && current.name !== '') {
+            console.log('Found selectable group:', current.name);
             return current;
         }
         
         current = current.parent;
     }
     
+    console.log('No selectable parent found');
     return null;
 }
 
