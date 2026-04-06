@@ -215,10 +215,10 @@ function createGround(ground_name) {
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far  = 500;
-    sunLight.shadow.camera.left   = -100;
-    sunLight.shadow.camera.right  =  100;
-    sunLight.shadow.camera.top    =  100;
-    sunLight.shadow.camera.bottom = -100;
+    sunLight.shadow.camera.left   = -2500;
+    sunLight.shadow.camera.right  =  2500;
+    sunLight.shadow.camera.top    =  2500;
+    sunLight.shadow.camera.bottom = -2500;
     scene.add(sunLight);
 
     const ambientLight = new THREE.AmbientLight(0xFFFFFF, 1.0); // soft sky blue fill
@@ -243,18 +243,18 @@ function createGround(ground_name) {
     const diffTexture = textureLoader.load(folderName + '.blend/textures/' + texturePrefix + '_diff_4k.jpg');
     diffTexture.wrapS = THREE.RepeatWrapping;
     diffTexture.wrapT = THREE.RepeatWrapping;
-    diffTexture.repeat.set(20, 20);
+    diffTexture.repeat.set(100, 100); // Increased for larger ground area
     diffTexture.colorSpace = THREE.SRGBColorSpace; // ← fix: correct color space
 
 
     const normalTexture = textureLoader.load(folderName + '.blend/textures/' + texturePrefix + '_nor_gl_4k.exr');
     normalTexture.wrapS = THREE.RepeatWrapping;
     normalTexture.wrapT = THREE.RepeatWrapping;
-    normalTexture.repeat.set(20, 20);
+    normalTexture.repeat.set(100, 100); // Increased for larger ground area
     normalTexture.flipY = false; // ← fix: Blender-exported normals don't need flipping
 
     // ── Ground Mesh ───────────────────────────────────────────────────────────
-    const groundGeometry = new THREE.PlaneGeometry(200, 200, 128, 128);
+    const groundGeometry = new THREE.CircleGeometry(2500, 128); // 5000 units diameter (radius 2500)
     const groundMaterial = new THREE.MeshStandardMaterial({
         map:         diffTexture,
         normalMap:   normalTexture,
@@ -271,7 +271,7 @@ function createGround(ground_name) {
     scene.add(ground);
 
     // ── Grid Helper ────────────────────────────────────────────────────────────
-    const gridHelper = new THREE.GridHelper(200, 50, 0xA09070, 0x807050);
+    const gridHelper = new THREE.GridHelper(5000, 100, 0xA09070, 0x807050);
     gridHelper.position.y = -2.99;
     scene.add(gridHelper);
 }
@@ -795,6 +795,19 @@ function animate() {
     if (helicopterModel && (velocityX !== 0 || velocityZ !== 0)) {
         helicopterModel.position.x += velocityX * delta;
         helicopterModel.position.z += velocityZ * delta;
+        
+        // Boundary check - keep helicopter within 2500 unit radius circle
+        const distanceFromCenter = Math.sqrt(
+            helicopterModel.position.x * helicopterModel.position.x + 
+            helicopterModel.position.z * helicopterModel.position.z
+        );
+        
+        if (distanceFromCenter > 2500) {
+            // Clamp position to boundary
+            const angle = Math.atan2(helicopterModel.position.z, helicopterModel.position.x);
+            helicopterModel.position.x = Math.cos(angle) * 2500;
+            helicopterModel.position.z = Math.sin(angle) * 2500;
+        }
         
         // Rotate model to face movement direction
         const angle = Math.atan2(velocityX, velocityZ);
