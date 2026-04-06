@@ -57,6 +57,12 @@ let hoverMaterial = new THREE.MeshBasicMaterial({
     side: THREE.DoubleSide
 });
 
+// Movement variables
+let velocityX = 0;
+let velocityZ = 0;
+let movementSpeed = 20; // units per second
+const keys = {};
+
 // Rotor detection patterns
 const mainRotorPatterns = [
     'main', 'rotor', 'blade', 'propeller', 'head', 
@@ -134,9 +140,9 @@ function init() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.minDistance = 3;
-    controls.maxDistance = 100;
+    controls.maxDistance = 80;  // Reduced for closer follow
     controls.maxPolarAngle = Math.PI / 2 + 0.3;
-    controls.autoRotate = true;
+    controls.autoRotate = false;  // Disable auto-rotate when following
     controls.autoRotateSpeed = 0.5;
 
     // Setup lighting
@@ -776,6 +782,25 @@ function animate() {
     const delta = clock.getDelta();
     const rotationSpeed = 15; // Base rotation speed
 
+    // Handle keyboard input for movement
+    velocityX = 0;
+    velocityZ = 0;
+    
+    if (keys['ArrowUp'] || keys['w'] || keys['W']) velocityZ += movementSpeed;
+    if (keys['ArrowDown'] || keys['s'] || keys['S']) velocityZ -= movementSpeed;
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) velocityX -= movementSpeed;
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) velocityX += movementSpeed;
+
+    // Update helicopter position
+    if (helicopterModel && (velocityX !== 0 || velocityZ !== 0)) {
+        helicopterModel.position.x += velocityX * delta;
+        helicopterModel.position.z += velocityZ * delta;
+        
+        // Rotate model to face movement direction
+        const angle = Math.atan2(velocityX, velocityZ);
+        helicopterModel.rotation.y = angle;
+    }
+
     // Animate main rotor (rotate around Y axis)
     if (mainRotor) {
         mainRotor.rotation.y += rotationSpeed * mainRotorSpeed * delta;
@@ -786,12 +811,36 @@ function animate() {
         tailRotor.rotation.z += rotationSpeed * tailRotorSpeed * delta;
     }
 
-    // Update controls
-    controls.update();
+    // Camera follow the helicopter model
+    if (helicopterModel) {
+        // Update OrbitControls target to helicopter position
+        controls.target.copy(helicopterModel.position);
+        controls.target.y += 3; // Look slightly above the model
+        
+        // Force camera closer by setting distance
+        const targetDistance = 20;  // Very close follow distance
+        const currentDistance = camera.position.distanceTo(controls.target);
+        
+        if (currentDistance > targetDistance) {
+            const direction = camera.position.clone().sub(controls.target).normalize();
+            camera.position.copy(controls.target).add(direction.multiplyScalar(targetDistance));
+        }
+        
+        controls.update();
+    }
 
     // Render scene
     renderer.render(scene, camera);
 }
+
+// Keyboard event handlers for movement
+document.addEventListener('keydown', (event) => {
+    keys[event.key] = true;
+});
+
+document.addEventListener('keyup', (event) => {
+    keys[event.key] = false;
+});
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
