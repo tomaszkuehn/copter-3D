@@ -61,7 +61,21 @@ let hoverMaterial = new THREE.MeshBasicMaterial({
 let velocityX = 0;
 let velocityZ = 0;
 let movementSpeed = 20; // units per second
+let targetRotationY = 0; // Target rotation for smooth turning
+let currentRotationY = 0; // Current interpolated rotation
+let forwardSpeed = 0; // Current forward speed (momentum)
+let turnRate = 0; // Current turning speed
 const keys = {};
+
+// New gradual control variables
+let currentSpeed = 0; // Current forward/backward speed
+let maxSpeed = 30; // Maximum speed
+let acceleration = 15; // Acceleration rate (units per second squared)
+let braking = 25; // Braking rate
+let currentHeading = 0; // Current facing direction in radians
+let turnVelocity = 0; // Current turning velocity
+let maxTurnSpeed = 2.0; // Maximum turn rate (radians per second)
+let turnAcceleration = 3.0; // How fast turning builds up
 
 // Rotor detection patterns
 const mainRotorPatterns = [
@@ -782,17 +796,47 @@ function animate() {
     const delta = clock.getDelta();
     const rotationSpeed = 15; // Base rotation speed
 
-    // Handle keyboard input for movement
-    velocityX = 0;
-    velocityZ = 0;
-    
-    if (keys['ArrowUp'] || keys['w'] || keys['W']) velocityZ += movementSpeed;
-    if (keys['ArrowDown'] || keys['s'] || keys['S']) velocityZ -= movementSpeed;
-    if (keys['ArrowLeft'] || keys['a'] || keys['A']) velocityX -= movementSpeed;
-    if (keys['ArrowRight'] || keys['d'] || keys['D']) velocityX += movementSpeed;
+    // Handle keyboard input for gradual movement
+    const isUp = keys['ArrowUp'] || keys['w'] || keys['W'];
+    const isDown = keys['ArrowDown'] || keys['s'] || keys['S'];
+    const isLeft = keys['ArrowLeft'] || keys['a'] || keys['A'];
+    const isRight = keys['ArrowRight'] || keys['d'] || keys['D'];
 
-    // Update helicopter position
-    if (helicopterModel && (velocityX !== 0 || velocityZ !== 0)) {
+    // Gradual acceleration (Up key increases speed)
+    if (isUp) {
+        currentSpeed = Math.min(currentSpeed + acceleration * delta, maxSpeed);
+    } else if (isDown) {
+        // Down key brakes (reduces speed toward 0, then reverses)
+        if (currentSpeed > 0) {
+            currentSpeed = Math.max(currentSpeed - braking * delta, 0);
+        } else {
+            currentSpeed = Math.max(currentSpeed - acceleration * delta * 0.5, -maxSpeed * 0.5);
+        }
+    }
+
+    // Gradual turning (Left/Right changes direction gradually)
+    if (isLeft) {
+        turnVelocity = Math.max(turnVelocity - turnAcceleration * delta, -maxTurnSpeed);
+    } else if (isRight) {
+        turnVelocity = Math.min(turnVelocity + turnAcceleration * delta, maxTurnSpeed);
+    } else {
+        // Return to center when no turn keys pressed
+        if (turnVelocity > 0) {
+            turnVelocity = Math.max(turnVelocity - turnAcceleration * delta * 0.5, 0);
+        } else if (turnVelocity < 0) {
+            turnVelocity = Math.min(turnVelocity + turnAcceleration * delta * 0.5, 0);
+        }
+    }
+
+    // Apply turning to heading
+    currentHeading += turnVelocity * delta;
+
+    // Update helicopter position based on current speed and heading
+    if (helicopterModel && Math.abs(currentSpeed) > 0.01) {
+        // Calculate velocity based on heading and speed
+        velocityX = Math.sin(currentHeading) * currentSpeed;
+        velocityZ = Math.cos(currentHeading) * currentSpeed;
+
         helicopterModel.position.x += velocityX * delta;
         helicopterModel.position.z += velocityZ * delta;
         
@@ -808,10 +852,11 @@ function animate() {
             helicopterModel.position.x = Math.cos(angle) * 2500;
             helicopterModel.position.z = Math.sin(angle) * 2500;
         }
-        
-        // Rotate model to face movement direction
-        const angle = Math.atan2(velocityX, velocityZ);
-        helicopterModel.rotation.y = angle;
+    }
+
+    // Apply heading rotation to model even when stationary
+    if (helicopterModel) {
+        helicopterModel.rotation.y = currentHeading;
     }
 
     // Animate main rotor (rotate around Y axis)
