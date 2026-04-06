@@ -74,8 +74,14 @@ let acceleration = 15; // Acceleration rate (units per second squared)
 let braking = 25; // Braking rate
 let currentHeading = 0; // Current facing direction in radians
 let turnVelocity = 0; // Current turning velocity
-let maxTurnSpeed = 2.0; // Maximum turn rate (radians per second)
+let maxTurnSpeed = 1.0; // Maximum turn rate (radians per second)
 let turnAcceleration = 3.0; // How fast turning builds up
+
+// Camera height tracking
+let cameraHeightOffset = 15; // Maintain camera height above ground
+let cameraAngleOffset = 0; // Maintain camera angle around the model
+let lastHelicopterX = 0;
+let lastHelicopterZ = 0;
 
 // Rotor detection patterns
 const mainRotorPatterns = [
@@ -799,8 +805,8 @@ function animate() {
     // Handle keyboard input for gradual movement
     const isUp = keys['ArrowUp'] || keys['w'] || keys['W'];
     const isDown = keys['ArrowDown'] || keys['s'] || keys['S'];
-    const isLeft = keys['ArrowLeft'] || keys['a'] || keys['A'];
-    const isRight = keys['ArrowRight'] || keys['d'] || keys['D'];
+    const isRight = keys['ArrowLeft'] || keys['a'] || keys['A'];
+    const isLeft = keys['ArrowRight'] || keys['d'] || keys['D'];
 
     // Gradual acceleration (Up key increases speed)
     if (isUp) {
@@ -871,19 +877,34 @@ function animate() {
 
     // Camera follow the helicopter model
     if (helicopterModel) {
-        // Update OrbitControls target to helicopter position
+        // Update camera height and angle offsets if user manually changed them
+        const dx = camera.position.x - helicopterModel.position.x;
+        const dz = camera.position.z - helicopterModel.position.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+        const angle = Math.atan2(dx, dz);
+
+        // Update offsets if helicopter hasn't moved much (user is adjusting camera)
+        //const helicopterMoved = Math.abs(helicopterModel.position.x - lastHelicopterX) > 0.1 ||
+        //                       Math.abs(helicopterModel.position.z - lastHelicopterZ) > 0.1;
+
+        cameraHeightOffset = camera.position.y - helicopterModel.position.y;
+
+        // Update target position for OrbitControls
         controls.target.copy(helicopterModel.position);
         controls.target.y += 3; // Look slightly above the model
-        
-        // Force camera closer by setting distance
-        const targetDistance = 20;  // Very close follow distance
-        const currentDistance = camera.position.distanceTo(controls.target);
-        
-        if (currentDistance > targetDistance) {
-            const direction = camera.position.clone().sub(controls.target).normalize();
-            camera.position.copy(controls.target).add(direction.multiplyScalar(targetDistance));
-        }
-        
+
+        // Maintain camera position relative to helicopter
+        const newAngle = angle; //cameraAngleOffset;
+        const newDistance = 15; //Math.max(distance, 5); // Minimum distance
+        camera.position.x = helicopterModel.position.x + Math.sin(newAngle) * newDistance;
+        camera.position.z = helicopterModel.position.z + Math.cos(newAngle) * newDistance;
+        camera.position.y = helicopterModel.position.y + cameraHeightOffset;
+        console.log('Cam X:', camera.position.x.toFixed(2), 'Cam Y:', camera.position.y.toFixed(2), 'Cam Z:', camera.position.z.toFixed(2));
+
+        // Store last helicopter position
+        lastHelicopterX = helicopterModel.position.x;
+        lastHelicopterZ = helicopterModel.position.z;
+
         controls.update();
     }
 
