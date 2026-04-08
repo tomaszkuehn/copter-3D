@@ -78,10 +78,12 @@ let maxTurnSpeed = 1.0; // Maximum turn rate (radians per second)
 let turnAcceleration = 3.0; // How fast turning builds up
 
 // Camera height tracking
-let cameraHeightOffset = 15; // Maintain camera height above ground
-let cameraAngleOffset = 0; // Maintain camera angle around the model
-let lastHelicopterX = 0;
-let lastHelicopterZ = 0;
+//
+
+// Camera follow state
+let followOffset = new THREE.Vector3(10, 8, 15);
+let lastTargetPos = new THREE.Vector3();
+let isUserOrbiting = false;
 
 // Rotor detection patterns
 const mainRotorPatterns = [
@@ -130,7 +132,8 @@ function createProceduralSky() {
 function init() {
     // Create scene
     scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x1a1a2e, 50, 200);
+    //scene.fog = new THREE.Fog(0x999999, 50, 200); //0x1a1a2e
+    scene.fog = new THREE.FogExp2(0x999999, 0.01);
     scene.background = createProceduralSky();
 
     // Create camera
@@ -164,6 +167,17 @@ function init() {
     controls.maxPolarAngle = Math.PI / 2 + 0.3;
     controls.autoRotate = false;  // Disable auto-rotate when following
     controls.autoRotateSpeed = 0.5;
+
+
+    // Add this block here
+    controls.addEventListener('start', () => {
+        isUserOrbiting = true;
+    });
+
+    controls.addEventListener('end', () => {
+        isUserOrbiting = false;
+        followOffset.copy(camera.position).sub(controls.target);
+    });
 
     // Setup lighting
     setupLighting();
@@ -263,14 +277,14 @@ function createGround(ground_name) {
     const diffTexture = textureLoader.load(folderName + '.blend/textures/' + texturePrefix + '_diff_4k.jpg');
     diffTexture.wrapS = THREE.RepeatWrapping;
     diffTexture.wrapT = THREE.RepeatWrapping;
-    diffTexture.repeat.set(100, 100); // Increased for larger ground area
+    diffTexture.repeat.set(200, 200); // Increased for larger ground area
     diffTexture.colorSpace = THREE.SRGBColorSpace; // ← fix: correct color space
 
 
     const normalTexture = textureLoader.load(folderName + '.blend/textures/' + texturePrefix + '_nor_gl_4k.exr');
     normalTexture.wrapS = THREE.RepeatWrapping;
     normalTexture.wrapT = THREE.RepeatWrapping;
-    normalTexture.repeat.set(100, 100); // Increased for larger ground area
+    normalTexture.repeat.set(200, 200); // Increased for larger ground area
     normalTexture.flipY = false; // ← fix: Blender-exported normals don't need flipping
 
     // ── Ground Mesh ───────────────────────────────────────────────────────────
@@ -331,7 +345,7 @@ function loadModel() {
         function(object) {
             console.log('FBX model loaded successfully:', object);
             helicopterModel = object;
-            
+            helicopterModel.rotation.order = 'YXZ';
             // Enable shadows for all meshes
             object.traverse(function(child) {
                 if (child.isMesh) {
@@ -368,6 +382,21 @@ function loadModel() {
 
             // Detect rotors
             detectRotors(object);
+
+            // Initialize follow camera around loaded helicopter
+            const initialTarget = helicopterModel.position.clone();
+            initialTarget.y += 3;
+
+            controls.target.copy(initialTarget);
+            lastTargetPos.copy(initialTarget);
+
+            // Preserve current starting camera offset, or use your default one
+            followOffset.copy(camera.position).sub(controls.target);
+
+            // If you prefer forcing a known starting chase view, use this instead:
+            // camera.position.copy(controls.target).add(followOffset);
+
+            controls.update();
 
             // Hide loading screen
             const loadingElement = document.getElementById('loading');
@@ -876,36 +905,44 @@ function animate() {
     }
 
     // Camera follow the helicopter model
+    // Camera follow the helicopter model with constant orbit distance
     if (helicopterModel) {
-        // Update camera height and angle offsets if user manually changed them
-        const dx = camera.position.x - helicopterModel.position.x;
-        const dz = camera.position.z - helicopterModel.position.z;
-        const distance = Math.sqrt(dx * dx + dz * dz);
-        const angle = Math.atan2(dx, dz);
 
-        // Update offsets if helicopter hasn't moved much (user is adjusting camera)
-        //const helicopterMoved = Math.abs(helicopterModel.position.x - lastHelicopterX) > 0.1 ||
-        //                       Math.abs(helicopterModel.position.z - lastHelicopterZ) > 0.1;
+        if (true){ //currentSpeed > 0) {
+            helicopterModel.rotation.y = currentHeading;
 
-        cameraHeightOffset = camera.position.y - helicopterModel.position.y;
+            const targetPitch = THREE.MathUtils.clamp(currentSpeed / maxSpeed, -1, 1) * THREE.MathUtils.degToRad(8);
+            const targetRoll  = -THREE.MathUtils.clamp(turnVelocity / maxTurnSpeed, -1, 1) * THREE.MathUtils.degToRad(15);
 
-        // Update target position for OrbitControls
-        controls.target.copy(helicopterModel.position);
-        controls.target.y += 3; // Look slightly above the model
+            helicopterModel.rotation.x = THREE.MathUtils.lerp(helicopterModel.rotation.x, targetPitch, 0.08);
+            helicopterModel.rotation.z = THREE.MathUtils.lerp(helicopterModel.rotation.z, targetRoll, 0.08);
+        }
 
-        // Maintain camera position relative to helicopter
-        const newAngle = angle; //cameraAngleOffset;
-        const newDistance = 15; //Math.max(distance, 5); // Minimum distance
-        camera.position.x = helicopterModel.position.x + Math.sin(newAngle) * newDistance;
-        camera.position.z = helicopterModel.position.z + Math.cos(newAngle) * newDistance;
-        camera.position.y = helicopterModel.position.y + cameraHeightOffset;
-        console.log('Cam X:', camera.position.x.toFixed(2), 'Cam Y:', camera.position.y.toFixed(2), 'Cam Z:', camera.position.z.toFixed(2));
+        const desiredTarget = helicopterModel.position.clone();
+        desiredTarget.y += 3;
 
-        // Store last helicopter position
-        lastHelicopterX = helicopterModel.position.x;
-        lastHelicopterZ = helicopterModel.position.z;
+        // Current offset from target to camera
+        const offset = camera.position.clone().sub(controls.target);
+
+        // Preserve the user's current orbit radius
+        let radius = offset.length();
+        if (radius < controls.minDistance) radius = controls.minDistance;
+        if (radius > controls.maxDistance) radius = controls.maxDistance;
+
+        // Avoid zero-length offset
+        if (offset.lengthSq() < 0.000001) {
+            offset.set(0, 5, 15);
+            radius = offset.length();
+        }
+
+        offset.normalize().multiplyScalar(radius);
+
+        // Move target to helicopter, keep same orbit offset
+        controls.target.copy(desiredTarget);
+        camera.position.copy(desiredTarget).add(offset);
 
         controls.update();
+
     }
 
     // Render scene
