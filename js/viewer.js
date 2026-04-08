@@ -70,6 +70,7 @@ const keys = {};
 // New gradual control variables
 let currentSpeed = 0; // Current forward/backward speed
 let maxSpeed = 30; // Maximum speed
+let maxRevSpeed = 5; // Maximum reverse speed
 let acceleration = 15; // Acceleration rate (units per second squared)
 let braking = 25; // Braking rate
 let currentHeading = 0; // Current facing direction in radians
@@ -845,7 +846,7 @@ function animate() {
         if (currentSpeed > 0) {
             currentSpeed = Math.max(currentSpeed - braking * delta, 0);
         } else {
-            currentSpeed = Math.max(currentSpeed - acceleration * delta * 0.5, -maxSpeed * 0.5);
+            currentSpeed = Math.max(currentSpeed - acceleration * delta * 0.5, -maxRevSpeed * 0.5);
         }
     }
 
@@ -912,7 +913,7 @@ function animate() {
             helicopterModel.rotation.y = currentHeading;
 
             const targetPitch = THREE.MathUtils.clamp(currentSpeed / maxSpeed, -1, 1) * THREE.MathUtils.degToRad(8);
-            const targetRoll  = -THREE.MathUtils.clamp(turnVelocity / maxTurnSpeed, -1, 1) * THREE.MathUtils.degToRad(15);
+            const targetRoll  = -THREE.MathUtils.clamp(turnVelocity / maxTurnSpeed, -1, 1) * THREE.MathUtils.degToRad(25);
 
             helicopterModel.rotation.x = THREE.MathUtils.lerp(helicopterModel.rotation.x, targetPitch, 0.08);
             helicopterModel.rotation.z = THREE.MathUtils.lerp(helicopterModel.rotation.z, targetRoll, 0.08);
