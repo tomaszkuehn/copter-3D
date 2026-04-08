@@ -93,7 +93,7 @@ const mainRotorPatterns = [
 ];
 
 const tailRotorPatterns = [
-    'tail', 'rear', 'anti', 'boom', 'tr',
+    'tail', 'rear', 'anti', 'boom',
     'tail_rotor', 'tailrotor', 'heckrotor'
 ];
 
@@ -902,7 +902,7 @@ function animate() {
 
     // Animate tail rotor (rotate around Z axis)
     if (tailRotor) {
-        tailRotor.rotation.z += rotationSpeed * tailRotorSpeed * delta;
+        tailRotor.rotation.x -= rotationSpeed * tailRotorSpeed * delta;
     }
 
     // Camera follow the helicopter model
