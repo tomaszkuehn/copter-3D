@@ -187,14 +187,6 @@
         </div>
         
         <div class="control-group">
-            <label>Auto-Rotate Camera</label>
-            <div class="slider-container">
-                <input type="checkbox" id="auto-rotate" checked>
-                <span>Enable</span>
-            </div>
-        </div>
-        
-        <div class="control-group">
             <label>Terrain Texture</label>
             <select id="terrain-select" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;">
                 <option value="">Loading...</option>
@@ -209,11 +201,9 @@
     
     <div id="controls-help">
         <h3>Controls</h3>
-        <p>🖱️ Left Click + Drag: Rotate</p>
-        <p>🖱️ Right Click + Drag: Pan</p>
+        <p>UP(W) - speed forward, DOWN(S) - break, (LEFT)A, (RIGHT)D</p>
+        <p>🖱️ Left Click + Drag: Camera orbit</p>
         <p>🖱️ Scroll: Zoom</p>
-        <p>🖱️ Click on part: Select & View Name</p>
-        <p>🖱️ Hover over part: Preview Name</p>
     </div>
 
     <script type="module" src="js/viewer.js"></script>
