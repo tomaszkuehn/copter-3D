@@ -78,8 +78,7 @@ let turnVelocity = 0; // Current turning velocity
 let maxTurnSpeed = 1.0; // Maximum turn rate (radians per second)
 let turnAcceleration = 3.0; // How fast turning builds up
 
-// Camera height tracking
-//
+const sunLight = new THREE.DirectionalLight(0xfff4f4, 3.5); // warm sun color
 
 // Camera follow state
 let followOffset = new THREE.Vector3(10, 8, 15);
@@ -201,11 +200,11 @@ function init() {
 // Setup scene lighting
 function setupLighting() {
     // Ambient light
-    const ambientLight = new THREE.AmbientLight(0xCCCCCC, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xCCCCFF, 2.0);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfff4f4, 8.0); // warm sun color
-    sunLight.position.set(10, 100, 10);
+    //const sunLight = new THREE.DirectionalLight(0xfff4f4, 8.0); // warm sun color
+    sunLight.position.set(50, 100, 10);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width  = 4096;
     sunLight.shadow.mapSize.height = 4096;
@@ -220,17 +219,17 @@ function setupLighting() {
     scene.add(sunLight);
 
     // Fill light
-    const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+    const fillLight = new THREE.DirectionalLight(0x8888ff, 0.8);
     fillLight.position.set(-20, 10, -20);
     //scene.add(fillLight);
 
     // Rim light
     const rimLight = new THREE.DirectionalLight(0xffaa00, 0.4);
     rimLight.position.set(0, 10, -30);
-    //scene.add(rimLight);
+    scene.add(rimLight);
 
     // Hemisphere light for natural sky lighting
-    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3d5c3d, 0.3);
+    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3d5c3d, 0.6);
     scene.add(hemiLight);
 }
 
@@ -257,19 +256,10 @@ function createGround(ground_name) {
     diffTexture.colorSpace = THREE.SRGBColorSpace; // ← fix: correct color space
 
 
-    const normalTexture = textureLoader.load(folderName + '.blend/textures/' + texturePrefix + '_nor_gl_4k.exr');
-    normalTexture.wrapS = THREE.RepeatWrapping;
-    normalTexture.wrapT = THREE.RepeatWrapping;
-    normalTexture.repeat.set(200, 200); // Increased for larger ground area
-    normalTexture.flipY = false; // ← fix: Blender-exported normals don't need flipping
-
     // ── Ground Mesh ───────────────────────────────────────────────────────────
     const groundGeometry = new THREE.CircleGeometry(2500, 128); // 5000 units diameter (radius 2500)
     const groundMaterial = new THREE.MeshStandardMaterial({
         map:         diffTexture,
-        //normalMap:   normalTexture,
-        //normalScale: new THREE.Vector2(1, 1),
-        //color: 0x808080,
         roughness:   0.6,
         metalness:   0.0
         // ← no 'color' override — let the texture speak for itself
@@ -579,6 +569,16 @@ function animate() {
     // Camera follow the helicopter model
     // Camera follow the helicopter model with constant orbit distance
     if (helicopterModel) {
+
+        sunLight.target.position.copy(helicopterModel.position);
+
+        sunLight.position.set(
+            helicopterModel.position.x + 50,
+            helicopterModel.position.y + 100,
+            helicopterModel.position.z + 10
+        );
+
+        sunLight.target.updateMatrixWorld();
 
         if (true){ //currentSpeed > 0) {
             helicopterModel.rotation.y = currentHeading;
