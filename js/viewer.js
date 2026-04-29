@@ -395,7 +395,6 @@ function detectRotors(model) {
                     if (name.includes(pattern)) {
                         mainRotor = child;
                         mainRotorFound = true;
-                        updateStatus('main', child.name);
                         console.log('Main rotor found:', child.name);
                         break;
                     }
@@ -408,7 +407,6 @@ function detectRotors(model) {
                     if (name.includes(pattern)) {
                         tailRotor = child;
                         tailRotorFound = true;
-                        updateStatus('tail', child.name);
                         console.log('Tail rotor found:', child.name);
                         break;
                     }
@@ -418,23 +416,13 @@ function detectRotors(model) {
     });
 
 
-    // Final status update
+    // Log if rotors not found
     if (!mainRotorFound && !mainRotor) {
-        document.getElementById('main-rotor-status').textContent = 'Not Found - Check Console';
-        document.getElementById('main-rotor-status').style.color = '#ff6b6b';
+        console.log('Main rotor not found - Check Console');
     }
     if (!tailRotorFound && !tailRotor) {
-        document.getElementById('tail-rotor-status').textContent = 'Not Found - Check Console';
-        document.getElementById('tail-rotor-status').style.color = '#ff6b6b';
+        console.log('Tail rotor not found - Check Console');
     }
-}
-
-
-// Update status display
-function updateStatus(type, name) {
-    const element = document.getElementById(type + '-rotor-status');
-    element.textContent = name;
-    element.style.color = '#4fc3f7';
 }
 
 // Log model hierarchy for debugging
