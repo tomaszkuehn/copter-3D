@@ -208,6 +208,60 @@
             transform: scale(0.95);
         }
         
+        /* Audio controls */
+        #audio-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+        }
+        
+        #audio-toggle {
+            background: none;
+            border: none;
+            color: #4fc3f7;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        
+        #audio-toggle:hover {
+            transform: scale(1.1);
+        }
+        
+        #volume-slider {
+            width: 80px;
+            height: 6px;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, #4fc3f7, #00bcd4);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        #volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
         /* Hide controls on larger screens (optional - remove if you want them always visible) */
         @media (min-width: 2768px) {
             #mobile-controls {
@@ -267,6 +321,12 @@
         <p>🖱️ Scroll: Zoom</p>
     </div>
 
+    <!-- Audio controls -->
+    <div id="audio-controls">
+        <button id="audio-toggle" title="Toggle Sound">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="50" title="Volume">
+    </div>
+
     <!-- On-screen control buttons -->
     <div id="mobile-controls">
         <div id="controls-left">
@@ -278,6 +338,12 @@
             </div>
         </div>
     </div>
+
+    <!-- Audio element -->
+    <audio id="soundtrack" loop>
+        <source src="soundtrack.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
 
     <script>
         // Hide controls help after 10 seconds
@@ -291,6 +357,57 @@
                 }, 1000);
             }
         }, 10000);
+
+        // Audio controls
+        const audio = document.getElementById('soundtrack');
+        const audioToggle = document.getElementById('audio-toggle');
+        const volumeSlider = document.getElementById('volume-slider');
+        let isPlaying = false;
+
+        // Set initial volume
+        audio.volume = volumeSlider.value / 100;
+
+        // Play audio on first user interaction (required by browsers)
+        function startAudio() {
+            if (!isPlaying) {
+                audio.play().then(() => {
+                    isPlaying = true;
+                    audioToggle.textContent = '🔊';
+                }).catch(err => {
+                    console.log('Audio playback failed:', err);
+                });
+            }
+            // Remove listeners after first interaction
+            document.removeEventListener('click', startAudio);
+            document.removeEventListener('touchstart', startAudio);
+            document.removeEventListener('keydown', startAudio);
+        }
+
+        // Listen for user interaction to start audio
+        document.addEventListener('click', startAudio);
+        document.addEventListener('touchstart', startAudio);
+        document.addEventListener('keydown', startAudio);
+
+        // Toggle audio on button click
+        audioToggle.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering startAudio again
+            if (isPlaying) {
+                audio.pause();
+                audioToggle.textContent = '🔇';
+            } else {
+                audio.play().then(() => {
+                    audioToggle.textContent = '🔊';
+                }).catch(err => {
+                    console.log('Audio playback failed:', err);
+                });
+            }
+            isPlaying = !isPlaying;
+        });
+
+        // Volume slider
+        volumeSlider.addEventListener('input', () => {
+            audio.volume = volumeSlider.value / 100;
+        });
     </script>
 
     <script type="module" src="js/viewer.js"></script>
