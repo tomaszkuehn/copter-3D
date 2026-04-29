@@ -630,9 +630,79 @@ document.addEventListener('keyup', (event) => {
     keys[event.key] = false;
 });
 
+// On-screen button handlers for touch/click control
+function setupMobileControls() {
+    const buttons = document.querySelectorAll('.ctrl-btn');
+    
+    buttons.forEach(btn => {
+        const key = btn.dataset.key;
+        
+        // Mouse events
+        btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            keys[key] = true;
+            btn.classList.add('active');
+        });
+        
+        btn.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            keys[key] = false;
+            btn.classList.remove('active');
+        });
+        
+        btn.addEventListener('mouseleave', (e) => {
+            if (btn.classList.contains('active')) {
+                keys[key] = false;
+                btn.classList.remove('active');
+            }
+        });
+        
+        // Touch events for mobile
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            keys[key] = true;
+            btn.classList.add('active');
+        }, { passive: false });
+        
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys[key] = false;
+            btn.classList.remove('active');
+        }, { passive: false });
+        
+        btn.addEventListener('touchcancel', (e) => {
+            keys[key] = false;
+            btn.classList.remove('active');
+        });
+    });
+    
+    // Handle global mouseup/touchend to release keys if cursor moves off button
+    document.addEventListener('mouseup', () => {
+        buttons.forEach(btn => {
+            if (btn.classList.contains('active')) {
+                keys[btn.dataset.key] = false;
+                btn.classList.remove('active');
+            }
+        });
+    });
+    
+    document.addEventListener('touchend', () => {
+        buttons.forEach(btn => {
+            if (btn.classList.contains('active')) {
+                keys[btn.dataset.key] = false;
+                btn.classList.remove('active');
+            }
+        });
+    }, { passive: false });
+}
+
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        init();
+        setupMobileControls();
+    });
 } else {
     init();
+    setupMobileControls();
 }

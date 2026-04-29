@@ -148,6 +148,72 @@
             margin: 5px 0;
             color: #b0bec5;
         }
+        
+        /* On-screen control buttons */
+        #mobile-controls {
+            position: absolute;
+            bottom: 100px;
+            right: 20px;
+            z-index: 100;
+        }
+        
+        #controls-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .middle-row {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .ctrl-btn {
+            width: 70px;
+            height: 70px;
+            border: 2px solid rgba(79, 195, 247, 0.6);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #4fc3f7;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.1s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        
+        .ctrl-btn small {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+        
+        .ctrl-btn:hover {
+            background: rgba(79, 195, 247, 0.2);
+        }
+        
+        .ctrl-btn:active,
+        .ctrl-btn.active {
+            background: rgba(79, 195, 247, 0.4);
+            border-color: #4fc3f7;
+            transform: scale(0.95);
+        }
+        
+        /* Hide controls on larger screens (optional - remove if you want them always visible) */
+        @media (min-width: 2768px) {
+            #mobile-controls {
+                display: none;
+            }
+        }
     </style>
     
     <script type="importmap">
@@ -205,6 +271,32 @@
         <p>🖱️ Left Click + Drag: Camera orbit</p>
         <p>🖱️ Scroll: Zoom</p>
     </div>
+
+    <!-- On-screen control buttons -->
+    <div id="mobile-controls">
+        <div id="controls-left">
+            <button class="ctrl-btn" id="btn-forward" data-key="ArrowUp">▲<br><small>W/↑</small></button>
+            <div class="middle-row">
+                <button class="ctrl-btn" id="btn-left" data-key="ArrowLeft">◄<br><small>A/←</small></button>
+                <button class="ctrl-btn" id="btn-backward" data-key="ArrowDown">▼<br><small>S/↓</small></button>
+                <button class="ctrl-btn" id="btn-right" data-key="ArrowRight">►<br><small>D/→</small></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Hide controls help after 10 seconds
+        setTimeout(() => {
+            const controlsHelp = document.getElementById('controls-help');
+            if (controlsHelp) {
+                controlsHelp.style.transition = 'opacity 1s ease';
+                controlsHelp.style.opacity = '0';
+                setTimeout(() => {
+                    controlsHelp.style.display = 'none';
+                }, 1000);
+            }
+        }, 10000);
+    </script>
 
     <script type="module" src="js/viewer.js"></script>
 </body>
