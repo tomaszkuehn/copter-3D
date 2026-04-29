@@ -363,34 +363,54 @@
         const audioToggle = document.getElementById('audio-toggle');
         const volumeSlider = document.getElementById('volume-slider');
         let isPlaying = false;
+        let audioInitialized = false;
 
         // Set initial volume
         audio.volume = volumeSlider.value / 100;
 
-        // Play audio on first user interaction (required by browsers)
-        function startAudio() {
-            if (!isPlaying) {
+        // Initialize audio on user gesture (required by mobile browsers)
+        function initAudio() {
+            if (audioInitialized) return;
+            
+            audio.play().then(() => {
+                isPlaying = true;
+                audioInitialized = true;
+                audioToggle.textContent = '🔊';
+                console.log('Audio started successfully');
+            }).catch(err => {
+                console.log('Audio playback failed:', err);
+                // Show muted icon if autoplay fails
+                audioToggle.textContent = '🔇';
+            });
+            
+            // Remove listeners after first interaction
+            document.removeEventListener('touchstart', initAudio);
+            document.removeEventListener('click', initAudio);
+            document.removeEventListener('keydown', initAudio);
+        }
+
+        // Listen for user interaction to initialize audio
+        document.addEventListener('touchstart', initAudio, { once: false });
+        document.addEventListener('click', initAudio, { once: false });
+        document.addEventListener('keydown', initAudio, { once: false });
+
+        // Toggle audio on button click - works on all devices
+        audioToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            if (!audioInitialized) {
+                // First interaction - try to play
                 audio.play().then(() => {
                     isPlaying = true;
+                    audioInitialized = true;
                     audioToggle.textContent = '🔊';
                 }).catch(err => {
                     console.log('Audio playback failed:', err);
+                    alert('Tap again to enable sound');
                 });
+                return;
             }
-            // Remove listeners after first interaction
-            document.removeEventListener('click', startAudio);
-            document.removeEventListener('touchstart', startAudio);
-            document.removeEventListener('keydown', startAudio);
-        }
-
-        // Listen for user interaction to start audio
-        document.addEventListener('click', startAudio);
-        document.addEventListener('touchstart', startAudio);
-        document.addEventListener('keydown', startAudio);
-
-        // Toggle audio on button click
-        audioToggle.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent triggering startAudio again
+            
             if (isPlaying) {
                 audio.pause();
                 audioToggle.textContent = '🔇';
@@ -407,6 +427,17 @@
         // Volume slider
         volumeSlider.addEventListener('input', () => {
             audio.volume = volumeSlider.value / 100;
+        });
+        
+        // Handle audio events
+        audio.addEventListener('play', () => {
+            isPlaying = true;
+            audioToggle.textContent = '🔊';
+        });
+        
+        audio.addEventListener('pause', () => {
+            isPlaying = false;
+            audioToggle.textContent = '🔇';
         });
     </script>
 
